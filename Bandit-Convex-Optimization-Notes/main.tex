@@ -1,0 +1,326 @@
+\documentclass{article}
+\usepackage{graphicx, indentfirst, amssymb, amsmath, amsthm, placeins, xurl, hyperref, multicol, algorithm, algorithmic} 
+
+\title{Bandit Convex Optimization, Chap 6.1 - 6.3, Presentation Notes}
+\author{Artem Ivaniuk}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\section{BCO Intro}
+In real-world applications of Online Convexity Optimization, the feedback / loss function revealed to the player is incomplete.
+
+For Bandit Convex Optimization (BCO), we take the standard OCO setting and instead of the player finding out the entire gradient oracle (loss function) $f_t$, the player only has access to $f_t(x_t)$ where $x_t$ is the action played at time $t$.
+
+Set up:
+\begin{enumerate}
+\item At iteration $t$, the online player chooses $x_t \in \mathcal K$. 
+\item Then, a convex cost function $f_t \in \mathcal{F}: \mathcal{K} \to \mathbb{R}$ is chosen (not revealed to the player). $\mathcal F$ being the total set of functions available to the adversary
+\item The cost/loss incurred to the online player is $f_t(x_t)$ 
+\item \textbf{Main change}: only loss $f_t(x_t)$ is revealed to the player, not entire $f_t$
+\item For algorithm $\mathcal A$, same Regret definition:
+\[\operatorname{Regret}_T(\mathcal A) = \operatorname{sup}_{\{f_1, \dots, f_T\}\subseteq \mathcal F} \left\{\sum_{t=1}^T f_t(x_t) - \min_{x \in \mathcal K} \sum_{t=1}^T f_t(x)\right\}\]
+\end{enumerate}
+
+\section{Multi-Armed Bandit Reduction}
+
+Let $\ell_t \in \mathbb{R}^n$ be a loss vector, where $\ell_t(i)$ is the loss of action $i$.
+
+We define a linear function:
+\[
+f_t(x) = \ell_t^\top x
+\]
+
+If we choose action $i_t$, this corresponds to evaluating:
+\[
+f_t(i_t) = \ell_t(i_t)
+\]
+
+So the bandit setting is a special case of OCO with linear functions.
+
+The main issue is that we only observe $\ell_t(i_t)$ but we need information about all coordinates of $\ell_t$
+
+\section{Simple MAB Algorithm (Algorithm 20)}
+
+\begin{algorithm}
+\caption{Simple MAB algorithm}
+\begin{algorithmic}[1]
+\REQUIRE OCO algorithm $A$, parameter $\delta$
+\FOR{$t = 1$ to $T$}
+    \STATE Let $b_t$ be a Bernoulli random variable that equals $1$ with probability $\delta$
+    \IF{$b_t = 1$}
+        \STATE Choose $i_t \in \{1,2,\dots,n\}$ uniformly at random and play it
+        \STATE Let
+        $
+        \hat{\ell}_t(i) =
+        \begin{cases}
+        \frac{n}{\delta}\,\ell_t(i_t), & i = i_t \\
+        0, & \text{otherwise}
+        \end{cases}
+        $
+        \STATE Let $\hat{f}_t(x) = \hat{\ell}_t^\top x$ and update $x_{t+1} = A(\hat{f}_1,\dots,\hat{f}_t)$
+    \ELSE
+        \STATE Choose $i_t$ according to $x_t$ and play it
+        \STATE Set $\hat{\ell}_t = 0$, $\hat{f}_t = 0$, and $x_{t+1} = x_t$
+    \ENDIF
+\ENDFOR
+\end{algorithmic}
+\end{algorithm}
+
+Estimator:
+\[
+\hat{\ell}_t(i) =
+\begin{cases}
+\frac{n}{\delta} \ell_t(i_t) & i = i_t \\
+0 & \text{otherwise}
+\end{cases}
+\]
+
+We only observe $\ell_t(i_t)$ when we explore and pick $i_t$ uniformly. This happens with probability $\delta \cdot \frac{1}{n}$. To compensate for this, we divide by that probability:
+\[
+\frac{1}{\delta \cdot (1/n)} = \frac{n}{\delta}
+\]
+
+This gives:
+\[
+\mathbb{E}[\hat{\ell}_t(i)] = \ell_t(i)
+\]
+
+So the estimator is unbiased. The idea is that we rarely see each coordinate, so when we do see it, we scale it up to make it representative.
+
+\section{Lemma 6.2}
+
+We want to show:
+\[
+\mathbb{E}[\ell_t(i_t)] \le \mathbb{E}[\hat{\ell}_t^\top x_t] + \delta
+\]
+
+Split the expectation based on whether we explore or exploit:
+\[
+\mathbb{E}[\ell_t(i_t)] = \delta \mathbb{E}[\ell_t(i_t)\mid b_t=1] + (1-\delta)\mathbb{E}[\ell_t(i_t)\mid b_t=0]
+\]
+
+In the exploration case, losses are bounded in $[0,1]$, so:
+\[
+\mathbb{E}[\ell_t(i_t)\mid b_t=1] \le 1
+\]
+
+In the exploitation case, $i_t$ is sampled from $x_t$, so:
+\[
+\mathbb{E}[\ell_t(i_t)\mid b_t=0] = \ell_t^\top x_t
+\]
+
+Combining:
+\[
+\mathbb{E}[\ell_t(i_t)] \le \delta + \ell_t^\top x_t
+\]
+
+Since $\mathbb{E}[\hat{\ell}_t] = \ell_t$, we have:
+\[
+\mathbb{E}[\ell_t^\top x_t] = \mathbb{E}[\hat{\ell}_t^\top x_t]
+\]
+
+So:
+\[
+\mathbb{E}[\ell_t(i_t)] \le \mathbb{E}[\hat{\ell}_t^\top x_t] + \delta
+\]
+
+The idea is that exploitation behaves like the expected loss under $x_t$, and exploration adds at most $\delta$ error.
+
+\section{Lemma 6.1}
+
+We want to bound regret.
+
+We decompose:
+\[
+\text{Regret} = \text{regret on } \hat{\ell}_t + \delta T
+\]
+
+The first term comes from running OCO on $\hat{\ell}_t$. The second term comes from exploration, since we explore with probability $\delta$ each round.
+
+The estimator can be large:
+\[
+\|\hat{\ell}_t\| \le \frac{n}{\delta}
+\]
+
+This happens because we divide by a small probability. So rare observations get scaled up significantly.
+
+The regret behaves like:
+\[
+\frac{n}{\delta}\sqrt{\delta T} + \delta T
+\]
+
+First term comes from variance in the estimator, second from exploration.
+
+We balance these two terms by choosing:
+$\delta = n^{2/3} T^{-1/3}$
+
+This gives regret:
+$O(T^{2/3} n^{2/3})$
+
+The intuition is that we trade off between exploring enough to learn and not exploring too much to avoid large loss
+
+\pagebreak
+\section{EXP3 Algorithm (Algorithm 21)}
+\FloatBarrier
+\begin{algorithm}
+\caption{EXP3 - simple version}
+\begin{algorithmic}[1]
+\REQUIRE parameter $\varepsilon > 0$
+\STATE Set $x_1 = \left(\frac{1}{n},\dots,\frac{1}{n}\right)$
+\FOR{$t = 1$ to $T$}
+    \STATE Choose $i_t$ according to $x_t$ and play it
+    \STATE Let
+    $
+    \hat{\ell}_t(i) =
+    \begin{cases}
+    \frac{1}{x_t(i_t)}\,\ell_t(i_t), & i = i_t \\
+    0, & \text{otherwise}
+    \end{cases}
+    $
+    \STATE Update $y_{t+1}(i) = x_t(i)\exp(-\varepsilon \hat{\ell}_t(i))$
+    \STATE Set $x_{t+1} = \frac{y_{t+1}}{\|y_{t+1}\|_1}$
+\ENDFOR
+\end{algorithmic}
+\end{algorithm}
+\FloatBarrier
+
+Estimator:
+\[
+\hat{\ell}_t(i) =
+\begin{cases}
+\frac{\ell_t(i_t)}{x_t(i_t)} & i = i_t \\
+0 & \text{otherwise}
+\end{cases}
+\]
+
+We observe coordinate $i$ with probability $x_t(i)$, so we divide by $x_t(i)$ to correct for this. This again ensures:
+\[
+\mathbb{E}[\hat{\ell}_t(i)] = \ell_t(i)
+\]
+
+\section{Lemma 6.3}
+
+We bound:
+\[
+\mathbb{E}[\text{Regret}_T] \le 2\sqrt{T n \log n}
+\]
+
+We analyze:
+\[
+\mathbb{E}[x_t^\top \hat{\ell}_t^2]
+\]
+
+Only one coordinate of $\hat{\ell}_t$ is nonzero, so:
+\[
+x_t(i_t)\left(\frac{\ell_t(i_t)}{x_t(i_t)}\right)^2 = \frac{\ell_t(i_t)^2}{x_t(i_t)}
+\]
+
+Taking expectation:
+\[
+\sum_i x_t(i)\frac{\ell_t(i)^2}{x_t(i)} = \sum_i \ell_t(i)^2 \le n
+\]
+
+So although $\hat{\ell}_t$ can be large, it is large with small probability, and the expectation remains bounded.
+
+Using the Hedge bound:
+\[
+\text{Regret} \le \varepsilon T n + \frac{\log n}{\varepsilon}
+\]
+
+Choosing:
+\[
+\varepsilon = \sqrt{\frac{\log n}{T n}}
+\]
+
+gives the result.
+
+The improvement over the simple algorithm is that exploration happens every round, but in a controlled way, reducing variance.
+
+\section{General Reduction (Algorithm 22)}
+
+\begin{algorithm}
+\caption{Reduction to bandit feedback}
+\begin{algorithmic}[1]
+\REQUIRE convex set $K \subseteq \mathbb{R}^n$, first order online algorithm $A$
+\STATE Let $x_1 = A(\emptyset)$
+\FOR{$t = 1$ to $T$}
+    \STATE Generate distribution $D_t$, sample $y_t \sim D_t$ with $\mathbb{E}[y_t] = x_t$
+    \STATE Play $y_t$
+    \STATE Observe $f_t(y_t)$, generate $g_t$ with $\mathbb{E}[g_t] = \nabla f_t(x_t)$
+    \STATE Let $x_{t+1} = A(g_1,\dots,g_t)$
+\ENDFOR
+\end{algorithmic}
+\end{algorithm}
+
+The idea is to simulate gradients using an estimator $g_t$ that satisfies:
+\[
+\mathbb{E}[g_t] = \nabla f_t(x_t)
+\]
+
+\section{Lemma 6.5}
+
+Define:
+\[
+\xi_t = g_t - \nabla f_t(x_t)
+\]
+
+and:
+\[
+h_t(x) = f_t(x) + \xi_t^\top x
+\]
+
+Then:
+\[
+\nabla h_t(x_t) = g_t
+\]
+
+So the algorithm is effectively running OCO on $h_t$.
+
+Applying the OCO guarantee:
+\[
+\sum h_t(x_t) - \sum h_t(u) \le B_A
+\]
+
+Expanding:
+\[
+\sum f_t(x_t) + \sum \xi_t^\top x_t - \sum f_t(u) - \sum \xi_t^\top u
+\]
+
+Since:
+\[
+\mathbb{E}[\xi_t] = 0
+\]
+
+the noise terms vanish in expectation, giving:
+\[
+\mathbb{E}\left[\sum f_t(x_t)\right] - \sum f_t(u) \le \mathbb{E}[B_A]
+\]
+
+The idea is that we hide the noise inside the function, and expectation removes it.
+
+\section{Gradient Estimation}
+
+In one dimension:
+\[
+f'(x) \approx \frac{f(x+\varepsilon) - f(x-\varepsilon)}{2\varepsilon}
+\]
+
+But in the bandit setting, we only get one query.
+
+So we use randomness. In higher dimensions:
+\[
+g = \frac{n}{\varepsilon} f(x+\varepsilon u) u
+\]
+
+where $u$ is a random direction.
+
+Then:
+\[
+\mathbb{E}[g] = \nabla f(x)
+\]
+
+Each sample gives a directional estimate of the slope, and averaging over directions reconstructs the full gradient.
+
+\end{document}

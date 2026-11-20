@@ -1,0 +1,119 @@
+\documentclass[12pt]{article}
+\usepackage{graphicx, indentfirst, amssymb, amsmath, amsthm, placeins, xurl, hyperref, multicol, algorithm, algorithmic} 
+% \FloatBarrier
+
+\usepackage[
+  letterpaper,
+  margin=1in
+]{geometry}
+
+%\title{CS 514: Financial Online Convexity Optimization \\
+%DeMarzo et al \& Abernethy et al}
+%\author{Artem Ivaniuk \& Khyaati Sigicherla}
+%\date{\today}
+
+\begin{document}
+%\maketitle
+
+\noindent
+{\large \textbf{CS 514: Financial Online Convexity Optimization}}\\
+{\small DeMarzo et al. \& Abernethy et al.}\\
+{\normalsize Artem Ivaniuk \& Khyaati Sigicherla \hfill May 5, 2026}
+\vspace{1em}
+
+\section*{Introduction}
+
+Modern financial markets rely heavily on the pricing of derivative securities, with the European call option serving as a canonical example. A call option gives its holder the right to purchase an underlying asset at a fixed strike price at a future time, leading to a convex payoff of the form $(S_T - K)^+$. Determining the fair price of such derivatives is a central problem in financial economics and applied market research, with the recent works studied in this project applying online convexity optimization theory to this question.
+
+The classical solution is given by the Black–Scholes framework, which derives a unique price by assuming a stochastic model for asset prices, specifically geometric Brownian motion, along with continuous trading and no-arbitrage. Within this setting, option prices are obtained via replication: constructing a dynamic trading strategy that exactly matches the payoff. However, real markets violate many of these assumptions: trading is discrete, volatility is uncertain and time-varying, and price paths may exhibit jumps.
+
+This motivates a more robust approach: instead of committing to a specific probabilistic model, one can impose weaker, pathwise constraints on price movements and study what can be said about option prices in a worst-case sense. The two papers studied -- ``Online Trading Algorithms and Robust Option Pricing" by Peter DeMarzo, Ilan Kremer, and Yishay Mansour \cite{demarzo2006online} and ``Minimax Option Pricing Meets Black-Scholes in the Limit" by Jacob Abernethy, Rafael M. Frongillo, and Andre Wibisono \cite{abernethy2012minimax} -- develop such approaches using tools from online optimization and minimax analysis, respectively, providing both finite-horizon bounds and asymptotic connections to Black–Scholes.
+
+\section*{DeMarzo et al. Findings}
+``Online Trading Algorithms and Robust Option Pricing" begins by replacing strong stochastic assumptions with weak \emph{pathwise assumptions}. In discrete time, the stock evolves by $S_t = S_{t-1}(1 + r_t)$, and feasible price paths are restricted only by total realized quadratic variation $\sum_{t=1}^T r_t^2 \le Q$ and maximal one-period return $|r_t| \le M$. This allows jumps, adversarial paths, non-Gaussian behavior, nonstationarity, and discrete trading. Within this restricted path space $\mathcal{P}_{Q,M}$, the paper uses online trading algorithms to construct an interval $[C_l, C_u]$ that bounds a european call option price. It relies on the no-arbitrage assumption. In particular, no arbitrage gives that if one payoff dominates another on all admissible paths, then its initial cost must be at least as large. The idea is to establish a regret bound for an online algorithm and use the payoff domination principal to recover option price bounds. 
+
+First the paper introduce the "generic" online trading algorithm. Consider a market with assets $\{A_1,\dots,A_N\}$ that have values $V_{i,t}$ evolving as $V_{i,t} = V_{i,t-1}(1 + r_{i,t})$, $|r_{i,t}|\le M$, with $V_{i,0}=1$. Then, $V_{i,T} = \prod_{t=1}^T (1+r_{i,t})$. The algorithm starts with $G_0 = c$ and at each time $t$ allocates $x_t \in [0,1]$ to stock and $1-x_t$ to bond, giving wealth dynamics $G_{t+1} = G_t(1 + x_t r_t)$, where $x_t$ is chosen online using past information. It maintains weights $\{w_{i,t}\}$ with $\sum_i w_{i,0}=1$ and updates via $w_{i,t+1} = w_{i,t}(1 + \eta r_{i,t})$; normalized allocations are $x_{i,t} = \frac{w_{i,t}}{W_t}$, $W_t = \sum_i w_{i,t}$, yielding portfolio return $r_{G,t} = \sum_i x_{i,t} r_{i,t}$ and wealth recursion $G_t = G_{t-1}(1 + r_{G,t})$. The goal is to compete with the best fixed asset in hindsight, $G_T \approx \max\{\Phi_1,\dots,\Phi_N\}$ (i.e. for N=2: $x=1$ all stock, $x=0$ all bond). The key result (THM 1) is a pathwise regret bound: $\ln(G_T) \ge \ln(V_{i,T}) - \frac{1}{\eta}\ln\!\left(\frac{1}{w_{i,0}}\right) - (\eta-1)Q_i$, so the algorithm competes with each asset individually, hence with the best in hindsight. In the case $N=2$, this yields $G_T \ge \max\left\{ w_0^{1/\eta} e^{-(\eta-1)Q} S_T,\; (1-w_0)^{1/\eta} \right\}$, i.e., guarantees of the form $G_T \ge \max\{\alpha, \beta S_T\}$, with $w_0,\eta$ controlling the tradeoff between initial weight and quadratic-variation penalties.
+
+Next the paper cashes in on the "generic" OCO algorithm by using it to construct an upper bound by requiring that the terminal wealth $G_T$ dominates the call payoff. It introduces an "$(\alpha,\beta)$ guarantee" to mean $G_T \ge \max\{\alpha,\beta S_T\}$, and we can interpret $\max\{\alpha,\beta S_T\}$ as the payoff of a portfolio with $\alpha$ cash and $\beta$ calls with strike $K=\alpha/\beta$. Comparing two fixed "buy-and-hold" strategies shows this guarantee implies $C(K,T) \le \frac{1}{\beta} - K$, so to get the smallest possible upper bound we maximize $\beta$. This yields a two-control optimization over $(w_0,\eta)$, which we reduce to a one-dimensional problem by solving the constraint for $w_0(\eta,K)$, giving $\beta^*(K)=\max_\eta w_0(\eta,K)^{1/\eta} e^{-(\eta-1)Q}$. Substituting back gives $C(K,T) \le \frac{1}{\beta^*(K)} - K$. In particular, for an at-the-money call $K=1$ with $M=\sqrt{Q}/6$, the robust upper bound scales as $C(1,T)=\Theta(\sqrt{Q})$, matching the volatility scale of an at the money call option.
+
+The paper gave an upper bound using the specific generic constructive online algorithm. The authors pose the question: what is the smallest possible upper bound under $(Q,M)$ paths among all trading strategies? They address this by considering a zero-sum game between the "investor" (option underwriter) who chooses a trading strategy (shares $\Delta_t$) to minimize worst-case hedging cost, while the "adversary" (market) chooses a price path $(Q,M)$ to maximize the investor's loss. The investor's cost is the option payoff minus the strategy payoff. We define a "value function": $f(W=\text{current wealth},S=\text{current stock price},K=\text{strike}, Q=\text{remaining quadratic variation}, M=\text{max one-pd. return}, T=\text{number of remaining periods})$. This yields a dynamic programming recursion s.t. at each time step, the investor chooses $\Delta=\text{number of shares held}$, then the adversary chooses return $\tilde r$. As a consequence we have the evolution $W \mapsto W+\tilde r S\Delta, \qquad S\mapsto S(1+\tilde r), \qquad Q\mapsto Q-\tilde r^2.$ The value recursion is:
+$$f(W,S,K,Q,M,T) = \inf_{\Delta} \sup_{\tilde r\in \Sigma(Q,M)} \mathbb{E} \left[ f(W+\tilde r S\Delta,\, S(1+\tilde r),\, K,\, Q-\tilde r^2,\, M,\, T-1) \right]$$ The raw recursion is hard because $\Delta \in \mathbb R$ unbounded, the adversary has many distributions, and the state space continuous. The authors simplify in two stages. First, the minimax theorem allows them to interchange $\inf$ and $\sup$ so that the adversary first chooses the distribution $\tilde r$ and second the investor gives best response. Second, linearity in the wealth argument of the value function reduces the problem to $W=0$. A no-arbitrage argument implies $\mathbb{E}[\tilde r]=0$ (martingale), eliminating any advantage from drift, so $\Delta \in \mathbb R$ disappears, resolving the unbounded issue. Observe, a two-point distribution $\tilde r \in \{r_u,r_d\}, \quad r_u \in [0,\min\{M,\sqrt{Q}\}], \quad r_d \in [-\min\{M,\sqrt{Q}\},0]$ suffices to understand the adversary's choice of $\tilde r$. After discretizing $(r_u,r_d)$, this yields a binomial-tree-like robust dynamic programming problem. The authors conclude that there is a polynomial-time approximation algorithm that gives an approximate optimal upper bound. 
+
+Finally the authors construct a lower bound by building a trading strategy whose payoff is such that $G_T \le (S_T - K)^+$, under the assumption that all admissible paths have sufficient realized volatility $\sum_{t=1}^T r_t^2 \ge Q_{\min}$. The clever idea is to partition the set of admissible price paths $P_{Q,M}$, as those lying inside and outside the interval $A_{\rho_1,\rho_2} = \{S_t \in [1-\rho_1,\,1+\rho_2]\ \forall t\}$. On the “stable” paths inside this interval, the strategy uses a "square-momentum rule" $x_t = \frac{S_t^2}{1+S_t^2}$, which exploits accumulated quadratic variation, yielding a bound of the form $G_T \le \max\{\alpha, \beta S_T\}$ with $\alpha=\beta=e^{-h(\rho,M)Q_{\min}}$. Complementarily, for those paths that are outside this interval, the strategy switches to a "trade-once rule" meaning start at $x_1=\tfrac12$, do not trade while $S_t$ stays in the band, and once a boundary is hit, switch to a pure position $x_t \in \{0,1\}$ (all stock or all bond) and stop trading. Analysis shows this guarantees $G_T \le \max\{1,S_T\}$, and again yields a bound of the form $G_T \le \max\{\alpha, \beta S_T\}$ with explicit $\alpha,\beta < 1$. Considering both cases (square-momentum inside the band, trade-once outside) there is a global guarantee $G_T \le \max\{\alpha, \beta S_T\}$, which by no-arbitrage implies a nontrivial lower bound on the option price. This lower bound is seen to increases with the minimum realized quadratic variation parameter $Q_{\min}$. Thus, the option price has a positive lower bound that increases linearly with realized volatility $Q_{\min}$. This means more volatility implies a higher option value, which is the final result regarding the lower bound.
+
+This paper benchmarks its robust, pathwise option price bounds against Black--Scholes by showing that, even without stochastic assumptions, its bounds closely track the Black--Scholes prices while relying only on $(Q,M)$ constraints.
+
+\section*{Abernethy et al. Findings}
+``Minimax Option Pricing Meets Black-Scholes in the Limit" \cite{abernethy2012minimax} formulates option pricing as a zero-sum game between a trader and nature. Instead of assuming a stochastic model like classical theory, the setup is adversarial: the trader chooses a dynamic hedging strategy, while nature selects a price path subject to variance constraints. By no-arbitrage, the option price is defined as the worst-case expected loss of the trader relative to the payoff, leading to the minimax formulation
+$
+\inf_{A \in \mathcal{A}_n} \sup_{X \in \mathcal{X}^n_{C,\zeta}} L_n(A,X),
+$
+which can be interpreted as the minimal capital required to hedge against all admissible paths.
+
+The model is specified in discrete time. A price path is $S_n = (S_{n,0},\dots,S_{n,n})$ with $S_{n,0}=1$, and at each step $m$ the trader chooses a position $\Delta_m$ based on past information. This generates cumulative gains
+$
+\sum_{m=1}^n \left(\frac{S_{n,m}}{S_{n,m-1}} - 1\right)\Delta_m.
+$
+For a convex, $L$-Lipschitz payoff $g$ (e.g., $g(x)=(x-K)^+$), the loss relative to the payoff is
+$
+L_n(A,S_n) = \mathbb{E}\!\left[g(S_{n,n}) - \sum_{m=1}^n \left(\frac{S_{n,m}}{S_{n,m-1}} - 1\right)\Delta_m \right],
+$.
+Once we have the loss, the trader aims to minimize it and nature is trying to maximize it.
+
+Admissible paths are restricted through two conditions. The discrete variance constraint (DVC)
+$
+\mathbb{E}\big[(S_{n,m+1} - S_{n,m})^2 \mid \mathcal{F}_{n,m}\big] \le (\exp(c/n)-1)\,S_{n,m}^2
+$
+bounds conditional variance, while the $\zeta_n$-constraint
+$
+\left|\frac{S_{n,m+1}}{S_{n,m}} - 1\right| \le \zeta_n
+$
+controls one-step returns. In continuous time, these correspond to
+$
+\mathbb{E}[(X(t)-X(s))^2 \mid \mathcal{F}_s] \le (\exp(c(t-s))-1)\,X(s)^2,
+$
+which is satisfied by geometric Brownian motion and links the adversarial model to classical dynamics. Under those restrictions, the main result of the paper shows that
+$
+\lim_{n\to\infty} \inf_{A \in \mathcal{A}_n} \sup_{X \in \mathcal{X}^n_{C,\zeta}} L_n(A,X)
+=
+\mathbb{E}[g(G(1))],
+$
+where $G(t)=\exp(\sqrt{c}B(t) - \tfrac{ct}{2})$. Thus, as trading becomes continuous, the minimax value converges to the Black-Scholes price.
+
+The proof proceeds through combining a few main lemmas. First, Sion's minimax theorem allows switching the order of optimization,
+$
+\inf_A \sup_X L_n(A,X) = \sup_X \inf_A L_n(A,X),
+$
+so the problem can be analyzed from nature’s side. At that point, the second lemma shows that any optimal strategy must generate a martingale: if there were predictable drift, the trader could take large positions $\Delta_m$ and drive losses to $-\infty$. This forces
+$
+\mathbb{E}[S_{n,m+1} \mid \mathcal{F}_{n,m}] = S_{n,m}.
+$
+With this restriction, the problem becomes maximizing $\mathbb{E}[g(S_{n,n})]$ over martingales satisfying the variance bounds. Convexity of $g$ then implies that nature pushes variance as high as possible, leading to an extremal process $S_n^\ast$ that lives on the boundary of the constraints.
+To analyze its limit, we consider the log-transformed process
+$
+W_{n,m} = \log S_{n,m}^\ast + \frac{cm}{2n},
+$.
+Applying  martingale central limit theorem to it gives
+$
+S_n^\ast \Rightarrow G,
+$
+where $G$ is geometric Brownian motion. In this sense, the worst-case adversarial path converges to the classical model.
+
+Finally, lemmas 4 and 5 show the bounds of the process and show the convergence of the game value. For the upper bound,
+$
+\limsup_{n\to\infty} \inf_A \sup_X L_n(A,X) \le \mathbb{E}[g(G(1))],
+$
+using convergence in distribution and truncation. For the lower bound, one can construct a feasible process based on geometric Brownian motion that satisfies the constraints with high probability, giving
+$
+\mathbb{E}[g(G(1))] \le \liminf_{n\to\infty} \inf_A \sup_X L_n(A,X).
+$. 
+Hence, combining the two, the game value is equal to $\mathbb{E}[g(G(1))].$
+
+The implications of this paper's findings are quite interesting. The main result provides a theoretical justification for Black–Scholes as the limit of worst-case, adversarial formulation with only variance constraints. Even without assuming a stochastic process, the equilibrium of the hedging game naturally leads to the same pricing formula.
+
+\section*{Conclusion}
+Both papers formulate option pricing as a worst-case control problem under weak path constraints, but differ in how they resolve it. DeMarzo et al.\ construct explicit trading strategies using online learning guarantees to obtain pathwise upper and lower bounds via no-arbitrage, without specifying a probabilistic model. Abernethy et al.\ instead analyze the same adversarial pricing game in the high-frequency limit, showing that the minimax value converges to the Black--Scholes price and that the adversary’s optimal strategy converges to geometric Brownian motion. Thus, DeMarzo et al.\ provide finite-horizon, pathwise bounds derived from algorithmic guarantees, while Abernethy et al.\ show that this robust framework asymptotically recovers classical stochastic pricing, linking adversarial OCO-style analysis with the classical stochastic models. 
+
+\bibliographystyle{unsrt}
+\bibliography{references}
+\end{document}
