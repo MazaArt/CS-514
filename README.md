@@ -1,7 +1,5 @@
 # CS 514 — Online Convex Optimization
 
-Coursework by Artem Ivaniuk for Rutgers CS 514 (Online Convex Optimization).
-
 ## Contents
 
 - **`Bandit-Convex-Optimization-Notes/`** — Presentation notes on Bandit Convex
